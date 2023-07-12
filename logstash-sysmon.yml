@@ -1,0 +1,68 @@
+# My input from filebeat is configured with SSL
+input {
+  beats {
+    port => 5047
+    ssl => true
+    ssl_certificate_authorities => ["/etc/logstash/ca.pem"]
+    ssl_certificate => "/etc/logstash/logstash.pem"
+    ssl_key => "/etc/logstash/logstash.pkcs8"
+    ssl_verify_mode => "force_peer"
+  }
+}
+
+filter {
+# Parse the input and separates the sysmon event from syslog data (timestamp, hostname and application name)
+  grok {
+    break_on_match => true
+    # Match Sysmon4Linux XML logs
+    match => { "message" => "%{SYSLOGTIMESTAMP:Log_date} %{DATA:hostname} %{DATA:application}: %{GREEDYDATA:message}" }
+    overwrite => ["message"]
+  }
+# Parse the XML from sysmon (message field)
+  xml
+    {
+        source => "message"
+        # Extract fields
+        xpath =>
+        [
+            # Common data (event id, username, etc...)
+            "/Event/System/EventID/text()", "event.code",
+            "/Event/EventData/Data[@Name='User']/text()", "user.name",
+            "/Event/EventData/Data[@Name='LogonID']/text()", "user.id",
+            # Parameters for Network event (Event.id = 3)
+            "/Event/EventData/Data[@Name='SourceIp']/text()", "source.ip",
+            "/Event/EventData/Data[@Name='SourcePort']/text()", "source.port",
+            "/Event/EventData/Data[@Name='DestinationIp']/text()", "destination.ip",
+            "/Event/EventData/Data[@Name='DestinationPort']/text()", "destination.port",
+            "/Event/EventData/Data[@Name='DestinationPort']/text()", "destination.port",
+            "/Event/EventData/Data[@Name='Protocol']/text()", "network.protocol",
+            # Parameters for process event (Event.id = 1 (create) and 5 (terminate))
+            "/Event/EventData/Data[@Name='ProcessID']/text()", "process.id",
+            "/Event/EventData/Data[@Name='Image']/text()", "process.name",
+            "/Event/EventData/Data[@Name='OriginalFinalName']/text()", "process.executable",
+            "/Event/EventData/Data[@Name='CommandLine']/text()", "process.command_line",
+            "/Event/EventData/Data[@Name='CurrentDirectory']/text()", "process.working_directory",
+            "/Event/EventData/Data[@Name='ParentProcessID']/text()", "process.parent.id",
+            "/Event/EventData/Data[@Name='ParentImage']/text()", "process.parent.name",
+            "/Event/EventData/Data[@Name='ParentCommandLine']/text()", "process.parent.command_line",
+            "/Event/EventData/Data[@Name='ParentUser']/text()", "process.parent.username",
+            # Parameters for file create and delete (Eventid = 11 and Eventid = 23)
+            "/Event/EventData/Data[@Name='TargetFilename']/text()", "file.name",
+            # Parameters for RawAccessRead (Eventid = 9)
+            "/Event/EventData/Data[@Name='Device']/text()", "device.name"
+        ]
+		store_xml => true
+    target => "sysmon"
+    }
+}
+
+# Output to Elasticsearch
+output {
+  elasticsearch {
+    hosts => ["https://127.0.0.1:9200"]
+    index => "sysmon-linux-%{+YYYY.MM.dd}"
+    cacert => '/etc/logstash/ca.pem'
+    user => "XXX"
+    password => "XXX"
+  }
+:q}
