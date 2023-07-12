@@ -1,0 +1,48 @@
+filebeat.inputs:
+
+# Each - is an input. Most options can be set at the input level, so
+# you can use different inputs for various configurations.
+# Below are the input specific configurations.
+
+- type: log
+
+  # Change to true to enable this input configuration.
+  enabled: true
+
+  # Paths that should be crawled and fetched. Glob based paths.
+  paths:
+    - /var/log/sysmon.log
+    #- c:\programdata\elasticsearch\logs\*
+  fields:
+    sysmon: true
+
+# ============================== Filebeat modules ==============================
+
+filebeat.config.modules:
+  # Glob pattern for configuration loading
+  path: ${path.config}/modules.d/*.yml
+
+  # Set to true to enable config reloading
+  reload.enabled: true
+
+  # Period on which files under path should be checked for changes
+  reload.period: 10s
+
+# ======================= Elasticsearch template setting =======================
+
+
+setup.template.settings:
+  index.number_of_shards: 1
+  #index.codec: best_compression
+  #_source.enabled: false
+
+  #setup.template.name: "filebeat"
+  #setup.template.pattern: "filebeat-*"
+
+output.logstash:
+  hosts: ['127.0.0.1:5047']
+  ssl.certificate_authorities: ['/etc/filebeat/ca.pem']
+  ssl.certificate: '/etc/filebeat/beatclient.pem'
+  ssl.key: '/etc/filebeat/beatclient.key'
+  
+  
